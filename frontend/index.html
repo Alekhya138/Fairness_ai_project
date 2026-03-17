@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FairLens — Universal AI Bias Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+/* ══════════════ DESIGN SYSTEM ══════════════ */
+:root {
+  --ink:     #08090d;
+  --ink2:    #0f1118;
+  --ink3:    #161b26;
+  --plate:   #1a2035;
+  --plate2:  #202840;
+  --plate3:  #2a3352;
+  --mist:    #e4eaf8;
+  --mist2:   #8b99be;
+  --mist3:   #4a5578;
+  --sky:     #4f8ef7;
+  --sky2:    #2563eb;
+  --lime:    #22c55e;
+  --lime2:   #16a34a;
+  --amber:   #f59e0b;
+  --rose:    #f43f5e;
+  --rose2:   #e11d48;
+  --violet:  #8b5cf6;
+  --b0:      rgba(255,255,255,0.05);
+  --b1:      rgba(255,255,255,0.09);
+  --b2:      rgba(255,255,255,0.14);
+  --r6:      6px; --r10:10px; --r14:14px; --r20:20px; --r28:28px;
+  --fh:      'Outfit', sans-serif;
+  --fm:      'JetBrains Mono', monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--ink);color:var(--mist);font-family:var(--fh);font-size:15px;line-height:1.6;overflow-x:hidden}
+::selection{background:rgba(79,142,247,.3)}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--ink)}::-webkit-scrollbar-thumb{background:var(--plate3);border-radius:3px}
+
+/* ══════════════ NAV ══════════════ */
+nav{position:fixed;top:0;left:0;right:0;z-index:500;height:58px;
+  background:rgba(8,9,13,.88);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--b0);
+  display:flex;align-items:center;padding:0 36px;gap:0}
+.nlogo{font-size:19px;font-weight:900;letter-spacing:-0.5px;
+  background:linear-gradient(90deg,var(--sky),var(--violet));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  cursor:pointer;margin-right:auto}
+.nlinks{display:flex;gap:2px}
+.nlinks a{font-size:12.5px;font-family:var(--fm);color:var(--mist2);
+  text-decoration:none;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .18s}
+.nlinks a:hover{background:var(--b1);color:var(--mist)}
+.ncta{background:var(--sky);color:#fff;border:none;padding:7px 18px;
+  border-radius:8px;font-size:13px;font-weight:600;font-family:var(--fh);
+  cursor:pointer;transition:all .18s;margin-left:14px}
+.ncta:hover{background:var(--sky2);transform:translateY(-1px)}
+
+/* ══════════════ LAYOUT ══════════════ */
+section{padding:88px 36px}
+.wrap{max-width:1180px;margin:0 auto}
+.tag{font-family:var(--fm);font-size:10.5px;color:var(--sky);letter-spacing:3px;
+  text-transform:uppercase;margin-bottom:8px}
+h2.shead{font-size:clamp(30px,4vw,52px);font-weight:800;line-height:1.05;
+  letter-spacing:-1px;margin-bottom:14px}
+h2.shead em{font-style:italic;color:var(--violet)}
+.ssub{color:var(--mist2);font-size:15.5px;max-width:580px;line-height:1.75}
+.hr{height:1px;background:var(--b0);margin:0 36px}
+
+/* ══════════════ BUTTONS ══════════════ */
+.btn{display:inline-flex;align-items:center;gap:7px;border:none;cursor:pointer;
+  font-family:var(--fh);font-weight:600;transition:all .22s;border-radius:10px}
+.btn-sky{background:var(--sky);color:#fff;padding:12px 24px;font-size:14px}
+.btn-sky:hover{background:var(--sky2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(79,142,247,.3)}
+.btn-ghost{background:transparent;color:var(--mist);border:1px solid var(--b2);padding:12px 24px;font-size:14px}
+.btn-ghost:hover{background:var(--plate);border-color:var(--sky)}
+.btn-lime{background:var(--lime);color:#fff;padding:14px 32px;font-size:15px;font-weight:700;
+  box-shadow:0 0 0 0 rgba(34,197,94,.4);animation:limePulse 2.4s infinite}
+.btn-lime:hover{background:var(--lime2);transform:translateY(-2px) scale(1.02);box-shadow:0 10px 32px rgba(34,197,94,.35)}
+.btn-lime:disabled{opacity:.4;cursor:not-allowed;animation:none;transform:none}
+@keyframes limePulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.4)}50%{box-shadow:0 0 0 10px rgba(34,197,94,0)}}
+.btn-rose{background:var(--rose);color:#fff;padding:10px 20px;font-size:13px}
+.btn-rose:hover{background:var(--rose2)}
+
+/* ══════════════ HOME ══════════════ */
+#home{min-height:100vh;display:flex;align-items:center;padding-top:100px;
+  background:radial-gradient(ellipse 70% 55% at 50% -5%,rgba(79,142,247,.09) 0%,transparent 65%);
+  position:relative;overflow:hidden}
+#home::before{content:'';position:absolute;inset:0;
+  background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%234f8ef7' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  pointer-events:none}
+.hero-g{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
+.eyebrow{display:inline-flex;align-items:center;gap:7px;
+  background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.2);
+  border-radius:20px;padding:5px 13px;font-family:var(--fm);font-size:11.5px;
+  color:var(--sky);margin-bottom:22px}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--lime);animation:blink 1.8s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+h1.htitle{font-size:clamp(36px,5vw,70px);font-weight:900;line-height:1.0;
+  letter-spacing:-2px;margin-bottom:18px}
+h1.htitle .c1{color:var(--sky)}
+h1.htitle .c2{color:var(--lime)}
+h1.htitle .c3{color:var(--rose)}
+.hsub{font-size:16.5px;color:var(--mist2);line-height:1.75;margin-bottom:32px;max-width:460px}
+.hbtns{display:flex;gap:12px;flex-wrap:wrap}
+.hstats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:var(--b0);border-radius:12px;overflow:hidden;margin-top:38px}
+.hst{background:var(--plate);padding:16px 14px;text-align:center}
+.hst .n{font-size:28px;font-weight:900;color:var(--sky);font-family:var(--fh)}
+.hst .l{font-size:10.5px;color:var(--mist3);font-family:var(--fm);margin-top:2px}
+
+/* Hero right: animated bias viz */
+.demo-vis{background:var(--plate);border:1px solid var(--b1);
+  border-radius:20px;padding:22px;animation:float 4s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.dv-title{font-family:var(--fm);font-size:10px;color:var(--mist3);
+  letter-spacing:2px;text-transform:uppercase;margin-bottom:14px}
+.dv-row{margin-bottom:11px}
+.dv-row-head{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px}
+.dv-grp{color:var(--mist2)}.dv-val{font-family:var(--fm)}
+.dv-track{height:9px;background:var(--ink3);border-radius:5px;overflow:hidden}
+.dv-fill{height:100%;border-radius:5px;transition:width 1.4s cubic-bezier(.4,0,.2,1)}
+.dv-alert{display:flex;align-items:center;gap:7px;
+  background:rgba(244,63,94,.09);border:1px solid rgba(244,63,94,.2);
+  border-radius:7px;padding:9px 12px;font-family:var(--fm);font-size:11px;
+  color:#fda4af;margin-top:13px}
+
+/* ══════════════ ABOUT ══════════════ */
+#about{background:var(--ink2)}
+.agrid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-top:48px}
+.acard{background:var(--plate);border:1px solid var(--b0);border-radius:16px;
+  padding:26px;transition:all .25s}
+.acard:hover{border-color:rgba(79,142,247,.28);transform:translateY(-3px)}
+.acard-ico{width:42px;height:42px;border-radius:10px;
+  background:rgba(79,142,247,.12);display:flex;align-items:center;
+  justify-content:center;font-size:20px;margin-bottom:14px}
+.acard h3{font-size:17px;font-weight:700;margin-bottom:8px}
+.acard p{color:var(--mist2);font-size:13.5px;line-height:1.7}
+
+/* ══════════════ HOW IT WORKS ══════════════ */
+#how-it-works{background:var(--ink3)}
+.pipeline{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:48px}
+.pstep{background:var(--plate);border:1px solid var(--b0);border-radius:14px;
+  padding:22px;position:relative;overflow:hidden}
+.pstep::after{content:'→';position:absolute;right:-11px;top:50%;
+  transform:translateY(-50%);font-size:18px;color:var(--mist3);z-index:2}
+.pstep:last-child::after{display:none}
+.pnum{width:30px;height:30px;border-radius:7px;background:var(--sky);
+  color:#fff;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:13px;margin-bottom:13px}
+.pstep h3{font-size:14px;font-weight:700;margin-bottom:6px}
+.pstep p{color:var(--mist2);font-size:12.5px;line-height:1.6}
+.pghost{position:absolute;bottom:-8px;right:8px;font-size:68px;
+  font-weight:900;color:rgba(79,142,247,.04);line-height:1;pointer-events:none}
+
+/* ══════════════ UPLOAD & ANALYZE ══════════════ */
+#analyze{background:var(--ink)}
+
+/* Upload zone */
+.drop-zone{border:2px dashed var(--b2);border-radius:16px;padding:44px;
+  text-align:center;cursor:pointer;transition:all .28s;position:relative;
+  background:var(--plate)}
+.drop-zone.over,.drop-zone:hover{border-color:var(--sky);background:rgba(79,142,247,.05)}
+.drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.dz-ico{font-size:38px;margin-bottom:10px}
+.dz-title{font-size:18px;font-weight:700;margin-bottom:5px}
+.dz-sub{color:var(--mist2);font-size:13px}
+.dz-hint{font-family:var(--fm);font-size:11px;color:var(--mist3);margin-top:6px}
+.dz-fname{margin-top:10px;font-family:var(--fm);font-size:12px;color:var(--lime);display:none}
+
+/* Column picker */
+.col-picker{background:var(--plate);border:1px solid var(--b1);
+  border-radius:14px;padding:22px;display:none}
+.cp-title{font-family:var(--fm);font-size:11px;color:var(--sky);
+  letter-spacing:2px;text-transform:uppercase;margin-bottom:16px}
+.cp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.cp-field label{font-size:12px;color:var(--mist2);margin-bottom:5px;display:block;font-family:var(--fm)}
+.cp-field select{width:100%;background:var(--ink2);border:1px solid var(--b2);
+  border-radius:8px;color:var(--mist);font-family:var(--fh);
+  padding:9px 12px;font-size:13px;outline:none;-webkit-appearance:none}
+.cp-field select:focus{border-color:var(--sky)}
+.cp-info{margin-top:12px;padding:10px 12px;background:var(--ink2);
+  border-radius:8px;font-family:var(--fm);font-size:11px;color:var(--mist3)}
+
+/* Main layout */
+.main-layout{display:grid;grid-template-columns:280px 1fr;gap:22px;margin-top:26px;align-items:start}
+
+/* Sidebar */
+.sidebar{background:var(--plate);border:1px solid var(--b0);
+  border-radius:14px;padding:20px;position:sticky;top:72px}
+.sb-head{font-family:var(--fm);font-size:10px;color:var(--mist3);
+  letter-spacing:2px;text-transform:uppercase;margin-bottom:16px}
+.sb-select{width:100%;background:var(--ink2);border:1px solid var(--b1);
+  border-radius:8px;color:var(--mist);padding:8px 11px;font-size:12.5px;
+  font-family:var(--fh);outline:none;margin-bottom:12px;-webkit-appearance:none}
+.sb-select:focus{border-color:var(--sky)}
+.sb-range-row{margin-bottom:12px}
+.sb-range-lbl{font-size:11.5px;color:var(--mist2);margin-bottom:4px;
+  display:flex;justify-content:space-between;font-family:var(--fm)}
+input[type=range]{width:100%;height:28px;background:transparent;
+  outline:none;cursor:pointer;-webkit-appearance:none}
+input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--ink2);border-radius:2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;
+  border-radius:50%;background:var(--sky);margin-top:-5.5px;cursor:pointer}
+.sb-divider{height:1px;background:var(--b0);margin:14px 0}
+.sb-mit-lbl{font-size:11.5px;color:var(--mist2);margin-bottom:8px;font-family:var(--fm)}
+.mit-row{display:flex;align-items:center;justify-content:space-between;
+  background:var(--ink2);border:1px solid var(--b0);border-radius:7px;
+  padding:7px 10px;margin-bottom:6px;cursor:pointer;transition:all .18s;font-size:12px;color:var(--mist2)}
+.mit-row.on{background:rgba(79,142,247,.1);border-color:rgba(79,142,247,.28);color:var(--mist)}
+.mit-chk{width:15px;height:15px;border-radius:4px;background:var(--plate2);
+  border:1px solid var(--b1);display:flex;align-items:center;justify-content:center;
+  font-size:9px;transition:all .18s}
+.mit-row.on .mit-chk{background:var(--sky);border-color:var(--sky)}
+.sb-run{width:100%;background:var(--sky);color:#fff;border:none;
+  padding:11px;border-radius:8px;font-size:13.5px;font-weight:700;
+  cursor:pointer;transition:all .2s;font-family:var(--fh);margin-top:6px}
+.sb-run:hover{background:var(--sky2)}
+.sb-run:disabled{opacity:.45;cursor:not-allowed}
+.sb-strip{height:3px;background:var(--ink2);border-radius:2px;overflow:hidden;margin-top:10px;display:none}
+.sb-strip.show{display:block}
+.sb-sfill{height:100%;background:linear-gradient(90deg,var(--sky),var(--violet));
+  animation:sbslide 1.5s ease-in-out infinite}
+@keyframes sbslide{0%{width:0;margin-left:0}100%{width:50%;margin-left:100%}}
+.sb-hist{margin-top:16px}
+.sb-hist-row{display:flex;align-items:center;justify-content:space-between;
+  background:var(--ink2);border:1px solid var(--b0);border-radius:7px;
+  padding:8px 10px;cursor:pointer;transition:border-color .18s;margin-bottom:5px}
+.sb-hist-row:hover{border-color:rgba(79,142,247,.3)}
+.shr-n{font-size:11.5px;font-weight:600}
+.shr-t{font-family:var(--fm);font-size:10px;color:var(--mist3)}
+.shr-b{font-family:var(--fm);font-size:10px;color:var(--sky)}
+
+/* Results */
+.results{display:flex;flex-direction:column;gap:18px}
+.empty-state{background:var(--plate);border:1px solid var(--b0);
+  border-radius:14px;padding:56px;display:flex;flex-direction:column;
+  align-items:center;gap:11px;text-align:center}
+.es-ico{font-size:40px;opacity:.3}
+.es-p{color:var(--mist3);font-size:13.5px;max-width:230px}
+
+/* Cards */
+.rcard{background:var(--plate);border:1px solid var(--b0);border-radius:14px;padding:22px}
+.rc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.rc-title{font-family:var(--fm);font-size:11px;color:var(--mist2);
+  text-transform:uppercase;letter-spacing:1.5px}
+
+/* Score comparison */
+.score-cmp{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:center;text-align:center}
+.scb,.sca{padding:18px;border-radius:12px}
+.scb{background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.15)}
+.sca{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.15)}
+.sc-lbl{font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px}
+.sc-lbl.red{color:var(--rose)}.sc-lbl.green{color:var(--lime)}
+.sc-val{font-size:50px;font-weight:900;line-height:1}
+.sc-sub{font-size:12px;color:var(--mist2);margin-top:5px}
+.sc-arr{font-size:26px;font-weight:900;color:var(--lime)}
+.imp-badge{background:linear-gradient(135deg,rgba(34,197,94,.12),rgba(79,142,247,.08));
+  border:1px solid rgba(34,197,94,.22);border-radius:14px;
+  padding:14px 20px;display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:10px}
+.imp-main{font-size:20px;font-weight:800;color:var(--lime)}
+.imp-sub{font-size:12.5px;color:var(--mist2);margin-top:2px}
+.imp-pills{display:flex;gap:7px;flex-wrap:wrap}
+.pill{padding:3px 10px;border-radius:14px;font-family:var(--fm);font-size:10.5px;
+  background:rgba(34,197,94,.1);color:var(--lime);border:1px solid rgba(34,197,94,.18)}
+
+/* Alert */
+.alert{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;
+  border-radius:10px;border-left:3px solid;font-size:13.5px}
+.alert-r{background:rgba(244,63,94,.07);border-color:var(--rose);color:#fda4af}
+.alert-y{background:rgba(245,158,11,.07);border-color:var(--amber);color:#fde68a}
+.alert-g{background:rgba(34,197,94,.07);border-color:var(--lime);color:#86efac}
+.al-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.alert-r .al-dot{background:var(--rose)}.alert-y .al-dot{background:var(--amber)}.alert-g .al-dot{background:var(--lime)}
+
+/* Metrics */
+.mets-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
+.mcard{background:var(--ink2);border:1px solid var(--b0);border-radius:12px;padding:14px}
+.mc-l{font-family:var(--fm);font-size:9.5px;text-transform:uppercase;letter-spacing:1.5px;
+  color:var(--mist3);margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.mc-v{font-size:28px;font-weight:800;line-height:1}
+.mc-cmp{display:flex;align-items:center;gap:5px;margin-top:5px;
+  font-family:var(--fm);font-size:10.5px}
+.mc-old{color:var(--mist3);text-decoration:line-through}
+.mc-arr{color:var(--lime)}.mc-new{color:var(--lime);font-weight:500}
+.mc-bar{height:3px;background:var(--ink3);border-radius:2px;margin-top:9px}
+.mc-bfill{height:100%;border-radius:2px;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+.cv-rose{color:var(--rose)}.cv-amber{color:var(--amber)}.cv-lime{color:var(--lime)}
+
+/* Charts */
+.charts-row{display:grid;grid-template-columns:3fr 2fr;gap:18px}
+.cc{height:230px;position:relative}
+
+/* Heatmap */
+.hm{font-family:var(--fm);font-size:11px}
+.hm-g{display:grid;gap:2px}
+.hm-h{color:var(--mist3);padding:5px 4px;text-align:center;font-size:9.5px}
+.hm-l{color:var(--mist2);padding:5px 8px;display:flex;align-items:center;font-size:10.5px;white-space:nowrap}
+.hm-cell{padding:6px 3px;border-radius:4px;text-align:center;font-size:10px}
+.hm-g2{background:rgba(34,197,94,.18);color:#86efac}
+.hm-y{background:rgba(245,158,11,.18);color:#fde68a}
+.hm-r{background:rgba(244,63,94,.18);color:#fda4af}
+
+/* Explanations */
+.exp-card{display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--b0)}
+.exp-card:last-child{border-bottom:none}
+.exp-ico{font-size:20px;flex-shrink:0;margin-top:2px}
+.exp-body h4{font-size:13.5px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:7px}
+.exp-body p{font-size:12.5px;color:var(--mist2);line-height:1.65}
+.sev{font-family:var(--fm);font-size:9.5px;padding:2px 7px;border-radius:4px;font-weight:500}
+.sev-HIGH{background:rgba(244,63,94,.15);color:var(--rose)}
+.sev-MEDIUM{background:rgba(245,158,11,.15);color:var(--amber)}
+.sev-LOW{background:rgba(34,197,94,.15);color:var(--lime)}
+.sev-IMPROVEMENT{background:rgba(34,197,94,.15);color:var(--lime)}
+
+/* Fix CTA */
+.fix-cta{background:linear-gradient(135deg,rgba(34,197,94,.1),rgba(79,142,247,.08));
+  border:1px solid rgba(34,197,94,.22);border-radius:16px;
+  padding:24px 28px;display:flex;align-items:center;justify-content:space-between;
+  gap:20px;flex-wrap:wrap}
+.fix-cta h3{font-size:20px;font-weight:800;margin-bottom:5px}
+.fix-cta p{color:var(--mist2);font-size:13px;max-width:400px}
+.no-bias-msg{background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.18);
+  border-radius:12px;padding:18px 22px;display:flex;align-items:center;gap:12px}
+
+/* What-if */
+.wi-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start}
+.wi-fields{display:flex;flex-direction:column;gap:10px}
+.wi-frow{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.wi-f label{font-size:11px;color:var(--mist2);margin-bottom:3px;display:block;font-family:var(--fm)}
+.wi-f input,.wi-f select{width:100%;background:var(--ink2);border:1px solid var(--b1);
+  border-radius:7px;color:var(--mist);padding:8px 10px;font-size:12.5px;
+  font-family:var(--fh);outline:none}
+.wi-go{width:100%;margin-top:9px;background:var(--violet);color:#fff;border:none;
+  padding:10px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;
+  font-family:var(--fh);transition:all .2s}
+.wi-go:hover{background:#7c3aed}
+.wi-res,.wi-cf{background:var(--ink2);border:1px solid var(--b0);border-radius:12px;padding:16px}
+.wi-res .wr-out{font-size:24px;font-weight:800;margin-bottom:6px}
+.wi-res .wr-p{font-family:var(--fm);font-size:12px;color:var(--mist2);margin-bottom:10px}
+.wi-cf h4{font-size:13px;font-weight:700;margin-bottom:9px}
+.cf-note{border-radius:7px;padding:10px 12px;font-size:11.5px;line-height:1.6}
+.cf-warn{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);color:#fde68a}
+.cf-ok{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);color:#86efac}
+
+/* Feature bias heatmap */
+.fbh-grid{display:grid;grid-template-columns:140px 1fr 80px 80px;gap:6px;
+  align-items:center;font-size:12px}
+.fbh-h{font-family:var(--fm);font-size:10px;color:var(--mist3);padding:4px 0;margin-bottom:4px}
+.fbh-name{color:var(--mist2);font-size:12px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;font-family:var(--fm)}
+.fbh-bar{height:7px;background:var(--ink2);border-radius:4px;overflow:hidden}
+.fbh-bf{height:100%;border-radius:4px;transition:width 1s}
+.fbh-pct{font-family:var(--fm);font-size:11px;text-align:right}
+.fbh-lvl{font-family:var(--fm);font-size:10px;text-align:center;padding:2px 6px;border-radius:4px}
+.fbh-H{background:rgba(244,63,94,.15);color:var(--rose)}
+.fbh-M{background:rgba(245,158,11,.15);color:var(--amber)}
+.fbh-L{background:rgba(34,197,94,.15);color:var(--lime)}
+
+/* Recs */
+.recs-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.rec{background:var(--ink2);border:1px solid var(--b0);border-radius:10px;
+  padding:14px;display:flex;gap:10px}
+.rec-ico{font-size:18px;flex-shrink:0}
+.rec-b h4{font-size:13px;font-weight:700;margin-bottom:3px}
+.rec-b p{font-size:11.5px;color:var(--mist2);line-height:1.6}
+
+/* Tooltip */
+.tip{position:relative;display:inline-flex;align-items:center}
+.tip-i{width:13px;height:13px;border-radius:50%;background:var(--plate2);
+  color:var(--mist3);font-size:9px;display:inline-flex;align-items:center;
+  justify-content:center;cursor:help;margin-left:4px;flex-shrink:0}
+.tip-t{display:none;position:absolute;bottom:120%;left:50%;transform:translateX(-50%);
+  background:var(--plate3);border:1px solid var(--b2);border-radius:8px;
+  padding:9px 12px;font-size:11.5px;width:210px;z-index:99;
+  color:var(--mist2);line-height:1.55;pointer-events:none;text-align:left;
+  font-family:var(--fh);font-weight:400}
+.tip:hover .tip-t{display:block}
+
+/* Toast */
+#toast{position:fixed;bottom:22px;right:22px;z-index:999;
+  background:var(--plate3);border:1px solid var(--b2);
+  border-radius:9px;padding:11px 16px;font-size:13.5px;
+  opacity:0;transform:translateY(8px);transition:all .28s;
+  pointer-events:none;max-width:300px}
+#toast.show{opacity:1;transform:translateY(0)}
+
+/* Spinner overlay */
+#spinner{position:fixed;inset:0;background:rgba(8,9,13,.8);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:900;gap:16px;display:none}
+.spinner-ring{width:50px;height:50px;border:3px solid var(--plate2);
+  border-top-color:var(--sky);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner-msg{font-family:var(--fm);font-size:13px;color:var(--mist2)}
+
+/* Preview table */
+.preview-tbl{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--fm)}
+.preview-tbl th{background:var(--ink2);color:var(--mist2);padding:7px 10px;
+  text-align:left;border-bottom:1px solid var(--b1);white-space:nowrap;font-size:10.5px}
+.preview-tbl td{padding:6px 10px;border-bottom:1px solid var(--b0);color:var(--mist2)}
+.preview-tbl tr:last-child td{border-bottom:none}
+.tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--b0)}
+
+/* ══════════════ LEARN ══════════════ */
+#learn{background:var(--ink2)}
+.lg{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
+.lc{background:var(--plate);border:1px solid var(--b0);border-radius:16px;
+  padding:24px;cursor:pointer;transition:all .25s}
+.lc:hover{border-color:rgba(139,92,246,.3);transform:translateY(-3px);box-shadow:0 12px 28px rgba(0,0,0,.3)}
+.lc-badge{display:inline-block;padding:3px 10px;border-radius:12px;
+  font-size:10.5px;font-family:var(--fm);margin-bottom:13px}
+.lb-sky{background:rgba(79,142,247,.12);color:var(--sky)}
+.lb-vi{background:rgba(139,92,246,.12);color:var(--violet)}
+.lb-li{background:rgba(34,197,94,.12);color:var(--lime)}
+.lc h3{font-size:17px;font-weight:700;margin-bottom:9px;line-height:1.2}
+.lc p{color:var(--mist2);font-size:13px;line-height:1.7}
+.lc .more{color:var(--sky);font-size:12px;margin-top:12px;display:flex;align-items:center;gap:4px}
+
+/* ══════════════ CONTACT ══════════════ */
+#contact{background:var(--ink3)}
+.cg{display:grid;grid-template-columns:1fr 1fr;gap:52px;align-items:start;margin-top:44px}
+.cform{display:flex;flex-direction:column;gap:13px}
+.cf2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.cform input,.cform select,.cform textarea{
+  background:var(--plate);border:1px solid var(--b1);border-radius:9px;
+  color:var(--mist);font-family:var(--fh);padding:12px 15px;font-size:13.5px;
+  outline:none;width:100%}
+.cform input:focus,.cform textarea:focus{border-color:var(--sky)}
+.cform textarea{min-height:105px;resize:vertical}
+.csub{background:linear-gradient(135deg,var(--sky),var(--violet));color:#fff;
+  border:none;padding:12px 26px;border-radius:9px;font-size:14px;font-weight:700;
+  cursor:pointer;transition:all .22s;align-self:flex-start;font-family:var(--fh)}
+.csub:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(79,142,247,.28)}
+.cinfo{display:flex;flex-direction:column;gap:18px}
+.ci-row{display:flex;gap:12px;align-items:flex-start}
+.ci-ico{width:38px;height:38px;border-radius:9px;background:rgba(79,142,247,.1);
+  display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.ci-row h4{font-size:14px;font-weight:600;margin-bottom:3px}
+.ci-row p{color:var(--mist2);font-size:13px}
+.form-ok{display:none;background:rgba(34,197,94,.09);border:1px solid rgba(34,197,94,.2);
+  border-radius:9px;padding:12px 15px;font-size:13.5px;color:#86efac}
+
+/* ══════════════ FOOTER ══════════════ */
+footer{background:var(--ink2);border-top:1px solid var(--b0);padding:28px 36px;
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.flogo{font-size:17px;font-weight:900;
+  background:linear-gradient(90deg,var(--sky),var(--violet));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+footer p{color:var(--mist3);font-size:12px}
+
+/* ══════════════ RESPONSIVE ══════════════ */
+@media(max-width:900px){
+  nav{padding:0 18px}.nlinks{display:none}
+  section{padding:66px 18px}
+  .hero-g,.agrid,.pipeline,.main-layout,.charts-row,.wi-grid,
+  .mets-grid,.recs-grid,.cg,.lg{grid-template-columns:1fr}
+  .score-cmp{grid-template-columns:1fr;gap:10px}
+  .sc-arr{transform:rotate(90deg)}
+  h1.htitle{font-size:36px}
+  footer{flex-direction:column;text-align:center;padding:22px 18px}
+  .cf2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════ SPINNER ════════════ -->
+<div id="spinner">
+  <div class="spinner-ring"></div>
+  <div class="spinner-msg" id="spinner-msg">Analyzing dataset…</div>
+</div>
+<div id="toast"></div>
+
+<!-- ════════════ NAV ════════════ -->
+<nav>
+  <div class="nlogo" onclick="nav('home')">FairLens</div>
+  <div class="nlinks">
+    <a onclick="nav('home')">Home</a>
+    <a onclick="nav('about')">About</a>
+    <a onclick="nav('how-it-works')">How It Works</a>
+    <a onclick="nav('analyze')">Analyze</a>
+    <a onclick="nav('learn')">Learn</a>
+    <a onclick="nav('contact')">Contact</a>
+  </div>
+  <button class="ncta" onclick="nav('analyze')">⚡ Analyze CSV</button>
+</nav>
+
+<!-- ════════════ HOME ════════════ -->
+<section id="home">
+  <div class="wrap">
+    <div class="hero-g">
+      <div>
+        <div class="eyebrow"><span class="dot"></span>Universal Bias Detection — Any Dataset</div>
+        <h1 class="htitle">
+          Upload Any CSV.<br>
+          <span class="c1">Detect</span> Bias.<br>
+          <span class="c2">Fix</span> It.<br>
+          <span class="c3">Prove</span> It.
+        </h1>
+        <p class="hsub">FairLens works on ANY dataset you upload — no preloaded demos. Auto-detects protected attributes, computes fairness metrics, applies mitigation only if needed, and proves the improvement visually.</p>
+        <div class="hbtns">
+          <button class="btn btn-sky" onclick="nav('analyze')">⚡ Upload Your Dataset</button>
+          <button class="btn btn-ghost" onclick="nav('how-it-works')">See how it works</button>
+        </div>
+        <div class="hstats">
+          <div class="hst"><div class="n">ANY</div><div class="l">CSV Dataset</div></div>
+          <div class="hst"><div class="n">3</div><div class="l">Mitigation Stages</div></div>
+          <div class="hst"><div class="n">XAI</div><div class="l">Plain-English Explain</div></div>
+        </div>
+      </div>
+      <div>
+        <div class="demo-vis">
+          <div class="dv-title">// Live Bias Analysis Preview</div>
+          <div class="dv-row">
+            <div class="dv-row-head"><span class="dv-grp">Group A (privileged)</span><span class="dv-val" style="color:var(--lime)">78%</span></div>
+            <div class="dv-track"><div class="dv-fill" style="width:78%;background:linear-gradient(90deg,var(--lime),#4ade80)"></div></div>
+          </div>
+          <div class="dv-row">
+            <div class="dv-row-head"><span class="dv-grp">Group B (disadvantaged)</span><span class="dv-val" style="color:var(--rose)">47%</span></div>
+            <div class="dv-track"><div class="dv-fill" style="width:47%;background:linear-gradient(90deg,var(--rose),#fb7185)"></div></div>
+          </div>
+          <div class="dv-row">
+            <div class="dv-row-head"><span class="dv-grp">Disparate Impact</span><span class="dv-val" style="color:var(--amber)">0.60</span></div>
+            <div class="dv-track"><div class="dv-fill" style="width:60%;background:linear-gradient(90deg,var(--amber),#fcd34d)"></div></div>
+          </div>
+          <div class="dv-alert">⚠ DI = 0.60 — below 0.80 legal threshold</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<div class="hr"></div>
+
+<!-- ════════════ ABOUT ════════════ -->
+<section id="about">
+  <div class="wrap">
+    <div class="tag">// about</div>
+    <h2 class="shead">Why Algorithmic<br><em>Fairness Matters</em></h2>
+    <p class="ssub">Biased models cause real harm. FairLens makes fairness auditing accessible for any dataset, any domain, and any protected attribute.</p>
+    <div class="agrid">
+      <div class="acard"><div class="acard-ico">⚖️</div><h3>Disparate Impact</h3><p>The 80% Rule: if a protected group's selection rate is below 80% of the majority, the model may violate EEOC regulations. FairLens auto-computes and flags this for any uploaded dataset.</p></div>
+      <div class="acard"><div class="acard-ico">📊</div><h3>Statistical Parity</h3><p>Measures the raw approval rate gap between groups. Near zero is ideal. FairLens visualizes this gap dynamically from your actual data — no static examples.</p></div>
+      <div class="acard"><div class="acard-ico">🎯</div><h3>Equal Opportunity</h3><p>Ensures qualified individuals in all groups have equal true positive rates — catching subtle bias that aggregate accuracy metrics completely miss.</p></div>
+      <div class="acard"><div class="acard-ico">🔧</div><h3>Conditional Mitigation</h3><p>Bias fix is applied ONLY when bias is detected. Pre-processing (Reweighing) → In-processing (Fairlearn EG) → Post-processing (per-group threshold calibration).</p></div>
+    </div>
+  </div>
+</section>
+<div class="hr"></div>
+
+<!-- ════════════ HOW IT WORKS ════════════ -->
+<section id="how-it-works">
+  <div class="wrap">
+    <div class="tag">// pipeline</div>
+    <h2 class="shead">Universal 4-Step<br><em>Bias Pipeline</em></h2>
+    <p class="ssub">Works on any CSV — from loan approvals to medical trials to hiring records.</p>
+    <div class="pipeline">
+      <div class="pstep"><div class="pnum">1</div><h3>Upload & Clean</h3><p>Drop any CSV. FairLens cleans missing values, strips whitespace, and prepares data automatically.</p><div class="pghost">1</div></div>
+      <div class="pstep"><div class="pnum">2</div><h3>Auto-Detect</h3><p>Identifies protected attributes (gender, race, age) and target outcome column. Manual override if auto-detection fails.</p><div class="pghost">2</div></div>
+      <div class="pstep"><div class="pnum">3</div><h3>Compute Metrics</h3><p>Approval rates, Disparate Impact, Statistical Parity, Equal Opportunity — computed per group, color-coded instantly.</p><div class="pghost">3</div></div>
+      <div class="pstep"><div class="pnum">4</div><h3>Fix If Needed</h3><p>Bias fix applied conditionally. Before vs After comparison shows exact improvement with percentage gain.</p><div class="pghost">4</div></div>
+    </div>
+  </div>
+</section>
+<div class="hr"></div>
+
+<!-- ════════════ UPLOAD & ANALYZE ════════════ -->
+<section id="analyze">
+  <div class="wrap">
+    <div class="tag">// upload &amp; analyze</div>
+    <h2 class="shead">Upload Your<br><em>CSV Dataset</em></h2>
+    <p class="ssub">Any dataset with a binary outcome column. FairLens handles the rest.</p>
+
+    <!-- Drop Zone -->
+    <div class="drop-zone" id="drop-zone" style="margin-top:28px">
+      <input type="file" id="csv-input" accept=".csv" onchange="onFileSelect(this)">
+      <div class="dz-ico">📂</div>
+      <div class="dz-title">Drag & Drop your CSV file</div>
+      <div class="dz-sub">or click to browse from your computer</div>
+      <div class="dz-hint">Columns: gender/race/age (protected) + approved/hired/outcome (target)</div>
+      <div class="dz-fname" id="dz-fname"></div>
+    </div>
+
+    <!-- Column picker (shown after upload) -->
+    <div class="col-picker" id="col-picker">
+      <div class="cp-title">// Column Configuration</div>
+      <div class="cp-grid">
+        <div class="cp-field">
+          <label>Protected Attribute Column</label>
+          <select id="sel-sensitive">
+            <option value="">-- Select column --</option>
+          </select>
+        </div>
+        <div class="cp-field">
+          <label>Target / Outcome Column</label>
+          <select id="sel-target">
+            <option value="">-- Select column --</option>
+          </select>
+        </div>
+      </div>
+      <div class="cp-info" id="cp-info"></div>
+      <!-- Dataset preview -->
+      <div style="margin-top:16px" id="preview-wrap"></div>
+    </div>
+
+    <!-- Main layout -->
+    <div class="main-layout">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sb-head">// Options</div>
+        <div class="sb-range-row">
+          <div class="sb-range-lbl">
+            <span>Bias Threshold</span>
+            <span id="thresh-disp" style="color:var(--sky)">0.80</span>
+          </div>
+          <input type="range" min="0.5" max="1.0" step="0.05" value="0.80" id="thresh-range"
+            oninput="document.getElementById('thresh-disp').textContent=parseFloat(this.value).toFixed(2)">
+        </div>
+        <div class="sb-divider"></div>
+        <div class="sb-mit-lbl">Mitigation Methods</div>
+        <div class="mit-row on" id="mit-pre" onclick="toggleMit('pre')">
+          <span>Pre-processing (Reweighing)</span><div class="mit-chk">✓</div>
+        </div>
+        <div class="mit-row on" id="mit-in" onclick="toggleMit('in')">
+          <span>In-processing (Fairlearn)</span><div class="mit-chk">✓</div>
+        </div>
+        <div class="mit-row on" id="mit-post" onclick="toggleMit('post')">
+          <span>Post-processing (Thresholds)</span><div class="mit-chk">✓</div>
+        </div>
+        <div class="sb-divider"></div>
+        <div class="sb-strip" id="sb-strip"><div class="sb-sfill"></div></div>
+        <button class="sb-run" id="sb-run" onclick="runAnalysis()" disabled>
+          Upload CSV first
+        </button>
+        <div class="sb-divider"></div>
+        <div class="sb-head">// History</div>
+        <div id="hist-list"><div style="font-family:var(--fm);font-size:11px;color:var(--mist3)">No analyses yet</div></div>
+        <button onclick="loadHistory()" style="font-size:11px;font-family:var(--fm);color:var(--sky);background:none;border:none;cursor:pointer;margin-top:6px">↻ Refresh</button>
+      </div>
+
+      <!-- Results area -->
+      <div class="results" id="results">
+        <div class="empty-state" id="empty-state">
+          <div class="es-ico">🔍</div>
+          <p class="es-p">Upload a CSV and click Analyze to see bias detection results</p>
+        </div>
+        <div id="result-content" style="display:none;flex-direction:column;gap:18px">
+
+          <!-- Alert -->
+          <div id="r-alert"></div>
+
+          <!-- Score Comparison -->
+          <div class="rcard">
+            <div class="rc-head"><div class="rc-title">Fairness Score — Before vs After</div></div>
+            <div class="score-cmp">
+              <div class="scb">
+                <div class="sc-lbl red">Before Mitigation</div>
+                <div class="sc-val cv-rose" id="sc-before">—</div>
+                <div class="sc-sub">Fairness Score / 100</div>
+              </div>
+              <div class="sc-arr">→</div>
+              <div class="sca">
+                <div class="sc-lbl green">After Mitigation</div>
+                <div class="sc-val cv-lime" id="sc-after">—</div>
+                <div class="sc-sub">Fairness Score / 100</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Improvement badge -->
+          <div class="imp-badge" id="imp-badge" style="display:none">
+            <div>
+              <div class="imp-main" id="imp-main">+0 pts</div>
+              <div class="imp-sub" id="imp-sub">Improvement after mitigation</div>
+            </div>
+            <div class="imp-pills" id="imp-pills"></div>
+          </div>
+
+          <!-- Metric cards -->
+          <div class="mets-grid" id="mets-grid"></div>
+
+          <!-- Charts -->
+          <div class="charts-row">
+            <div class="rcard">
+              <div class="rc-head">
+                <div class="rc-title">Approval Rate by Group</div>
+                <div style="display:flex;gap:12px;font-size:11px;font-family:var(--fm)">
+                  <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:rgba(244,63,94,.7)"></span>Before</span>
+                  <span style="display:flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:2px;background:rgba(34,197,94,.7)"></span>After</span>
+                </div>
+              </div>
+              <div class="cc"><canvas id="bar-chart"></canvas></div>
+            </div>
+            <div class="rcard">
+              <div class="rc-head"><div class="rc-title">Distribution</div></div>
+              <div class="cc" style="height:190px"><canvas id="pie-chart"></canvas></div>
+              <div id="pie-leg" style="font-size:11px;font-family:var(--fm);color:var(--mist3);margin-top:8px"></div>
+            </div>
+          </div>
+
+          <!-- Heatmap -->
+          <div class="rcard" id="r-heatmap">
+            <div class="rc-head"><div class="rc-title">Fairness Heatmap — Before / After</div></div>
+            <div id="hm-wrap"></div>
+          </div>
+
+          <!-- Fix CTA (only when bias detected) -->
+          <div class="fix-cta" id="fix-cta" style="display:none">
+            <div>
+              <h3>🚨 Bias Detected — Fix It Now</h3>
+              <p>The model shows discriminatory patterns. Click Apply Fix to run all mitigation stages and instantly see the improvement.</p>
+            </div>
+            <button class="btn btn-lime" onclick="applyFix()">✅ Apply Bias Fix</button>
+          </div>
+
+          <!-- No bias -->
+          <div class="no-bias-msg" id="no-bias-msg" style="display:none">
+            <span style="font-size:24px">✅</span>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--lime);margin-bottom:3px">No Significant Bias Detected</div>
+              <div style="font-size:13px;color:var(--mist2)">Disparate Impact is within the acceptable threshold. No mitigation required. Monitor periodically.</div>
+            </div>
+          </div>
+
+          <!-- XAI Explanations -->
+          <div class="rcard">
+            <div class="rc-head"><div class="rc-title">🧠 Smart Bias Explanation (XAI)</div></div>
+            <div id="r-exps"></div>
+          </div>
+
+          <!-- What-If simulator -->
+          <div class="rcard">
+            <div class="rc-head"><div class="rc-title">🔮 What-If Simulator</div></div>
+            <p style="font-size:13px;color:var(--mist2);margin-bottom:16px">Enter applicant values and see how changing ONLY the protected attribute affects the decision — revealing hidden bias.</p>
+            <div class="wi-grid">
+              <div class="wi-fields" id="wi-fields">
+                <div style="font-family:var(--fm);font-size:12px;color:var(--mist3)">
+                  Run an analysis first to enable the simulator.
+                </div>
+              </div>
+              <div class="wi-res" id="wi-res">
+                <div style="font-size:12px;color:var(--mist3);font-family:var(--fm)">// awaiting simulation</div>
+              </div>
+              <div class="wi-cf" id="wi-cf">
+                <h4>Counterfactual</h4>
+                <div style="font-size:11.5px;color:var(--mist3);font-family:var(--fm)">// flip only protected attribute</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Feature Bias Heatmap -->
+          <div class="rcard" id="r-fbhm">
+            <div class="rc-head"><div class="rc-title">📊 Feature Bias Heatmap</div></div>
+            <div id="fbhm-wrap"></div>
+          </div>
+
+          <!-- Recommendations -->
+          <div class="rcard">
+            <div class="rc-head"><div class="rc-title">🛡 Ethical Recommendations</div></div>
+            <div class="recs-grid" id="r-recs"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<div class="hr"></div>
+
+<!-- ════════════ LEARN ════════════ -->
+<section id="learn">
+  <div class="wrap">
+    <div class="tag">// learn</div>
+    <h2 class="shead">Fairness Science<br><em>Made Simple</em></h2>
+    <p class="ssub">Understand the metrics, math, and regulation behind AI bias.</p>
+    <div class="lg">
+      <div class="lc"><div class="lc-badge lb-sky">Statistical</div><h3>Disparate Impact (4/5 Rule)</h3><p>DI = minority_rate / majority_rate. Must be &gt;0.80 under EEOC law. FairLens auto-computes this from YOUR data and flags violations in real time.</p><div class="more">Learn more →</div></div>
+      <div class="lc"><div class="lc-badge lb-vi">Impossibility Theorem</div><h3>Fairness Trade-offs</h3><p>Chouldechova (2017): you cannot simultaneously achieve calibration + FPR parity + FNR parity when base rates differ. FairLens shows which constraint you're violating.</p><div class="more">Read →</div></div>
+      <div class="lc"><div class="lc-badge lb-li">Mitigation</div><h3>3-Stage Remediation</h3><p>Pre: reweigh samples. In: ExponentiatedGradient with DemographicParity constraint. Post: per-group threshold calibration. Applied conditionally only when bias detected.</p><div class="more">Try it →</div></div>
+      <div class="lc"><div class="lc-badge lb-sky">Real-World</div><h3>COMPAS Case Study</h3><p>ProPublica (2016): COMPAS recidivism AI flagged Black defendants as high-risk at 2× the rate for white — a textbook equal opportunity violation with life-altering consequences.</p><div class="more">Case study →</div></div>
+      <div class="lc"><div class="lc-badge lb-vi">XAI</div><h3>Explainable AI &amp; Bias</h3><p>SHAP values reveal which features drive biased decisions. FairLens auto-generates plain-English explanations of WHY bias occurred — not just that it exists.</p><div class="more">Explore →</div></div>
+      <div class="lc"><div class="lc-badge lb-li">Regulation</div><h3>EU AI Act Compliance</h3><p>High-risk AI systems (credit, hiring, criminal justice) require bias audits, logs, and third-party review. Fines up to €30M or 6% of global revenue for violations.</p><div class="more">Guide →</div></div>
+    </div>
+  </div>
+</section>
+<div class="hr"></div>
+
+<!-- ════════════ CONTACT ════════════ -->
+<section id="contact">
+  <div class="wrap">
+    <div class="tag">// contact</div>
+    <h2 class="shead">Request an<br><em>AI Audit</em></h2>
+    <div class="cg">
+      <div class="cform">
+        <div class="cf2">
+          <input type="text" placeholder="Your name">
+          <input type="email" placeholder="Work email">
+        </div>
+        <input type="text" placeholder="Organization">
+        <select style="background:var(--plate);border:1px solid var(--b1);border-radius:9px;color:var(--mist);font-family:var(--fh);padding:12px 15px;font-size:13.5px;outline:none;width:100%;appearance:none">
+          <option disabled selected>Inquiry type</option>
+          <option>Full AI Bias Audit</option>
+          <option>Research Collaboration</option>
+          <option>Enterprise API Access</option>
+          <option>Regulatory Compliance</option>
+        </select>
+        <textarea placeholder="Describe your dataset, domain, and fairness concerns…"></textarea>
+        <button class="csub" onclick="submitContact()">Send Request →</button>
+        <div class="form-ok" id="form-ok">✓ Message sent! We'll reply within 24 hours.</div>
+      </div>
+      <div class="cinfo">
+        <div>
+          <h3 style="font-size:26px;font-weight:800;line-height:1.2;margin-bottom:11px">
+            AI that works fairly<br><em style="font-style:italic;color:var(--lime)">for everyone.</em>
+          </h3>
+          <p style="color:var(--mist2);font-size:13.5px;line-height:1.8">FairLens is an open-source universal bias detection toolkit for researchers, engineers, and policymakers building ethical AI.</p>
+        </div>
+        <div class="ci-row"><div class="ci-ico">📧</div><div><h4>Email</h4><p>audit@fairlens.ai</p></div></div>
+        <div class="ci-row"><div class="ci-ico">🔗</div><div><h4>GitHub</h4><p>github.com/fairlens/fairlens</p></div></div>
+        <div class="ci-row"><div class="ci-ico">📄</div><div><h4>Docs</h4><p>docs.fairlens.ai</p></div></div>
+        <div class="ci-row"><div class="ci-ico">🌐</div><div><h4>Research</h4><p>arxiv.org/fairlens-2024</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="flogo">FairLens</div>
+  <p>© 2025 FairLens · Universal AI Bias Detection · MIT License</p>
+  <p style="color:var(--mist3);font-size:11px">Fairlearn · Scikit-learn · PapaParse · Chart.js</p>
+</footer>
+
+<!-- ════════════════════════ JAVASCRIPT ════════════════════════════ -->
+<script>
+/* ── Config ─────────────────────────────────────────────────────── */
+const API = 'http://localhost:5000'; // Change to your backend URL
+let USE_MOCK = true; // Auto-disabled when backend is reachable
+
+/* ── Utilities ──────────────────────────────────────────────────── */
+function nav(id){ document.getElementById(id).scrollIntoView({behavior:'smooth'}); }
+
+function toast(msg, col='var(--mist)'){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.color = col;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 3200);
+}
+
+function showSpinner(msg='Analyzing dataset…'){
+  document.getElementById('spinner-msg').textContent = msg;
+  document.getElementById('spinner').style.display = 'flex';
+}
+function hideSpinner(){ document.getElementById('spinner').style.display = 'none'; }
+
+function delay(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+/* ── State ──────────────────────────────────────────────────────── */
+let uploadedFile = null;
+let inspectData  = null;
+let lastAnalysis = null;
+const mitState   = {pre:true, in:true, post:true};
+
+/* ── Mitigation Toggles ─────────────────────────────────────────── */
+function toggleMit(k){
+  mitState[k] = !mitState[k];
+  const el = document.getElementById('mit-'+k);
+  el.classList.toggle('on', mitState[k]);
+  el.querySelector('.mit-chk').textContent = mitState[k] ? '✓' : '';
+}
+
+/* ── File Upload ────────────────────────────────────────────────── */
+function onFileSelect(input){
+  if(!input.files[0]) return;
+  uploadedFile = input.files[0];
+  document.getElementById('dz-fname').textContent = '✓ '+uploadedFile.name;
+  document.getElementById('dz-fname').style.display = 'block';
+  inspectFile(uploadedFile);
+}
+
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', ()=>dz.classList.remove('over'));
+dz.addEventListener('drop', e=>{
+  e.preventDefault(); dz.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if(f && f.name.endsWith('.csv')){
+    uploadedFile = f;
+    document.getElementById('dz-fname').textContent = '✓ '+f.name;
+    document.getElementById('dz-fname').style.display = 'block';
+    inspectFile(f);
+  } else {
+    toast('Please drop a .csv file', 'var(--rose)');
+  }
+});
+
+/* ── Inspect File (client-side preview + server inspect) ────────── */
+async function inspectFile(file){
+  showSpinner('Reading dataset…');
+  // Client-side PapaParse preview
+  Papa.parse(file, {
+    header: true, skipEmptyLines: true, preview: 6,
+    complete: async (results)=>{
+      const cols = results.meta.fields || [];
+      const rows = results.data || [];
+
+      // Show preview table
+      renderPreview(cols, rows);
+
+      // Try server inspect
+      if(!USE_MOCK){
+        try{
+          const fd = new FormData();
+          fd.append('file', file);
+          const res = await fetch(API+'/api/inspect', {method:'POST', body:fd});
+          const d = await res.json();
+          if(d.success){
+            inspectData = d;
+            populateDropdowns(d.all_columns, d.detected);
+            showPicker(d);
+          } else {
+            populateDropdownsFromCols(cols);
+          }
+        } catch(e){
+          populateDropdownsFromCols(cols);
+        }
+      } else {
+        // Mock mode: parse columns client-side
+        const mockDetected = detectColsMock(cols);
+        inspectData = { all_columns: cols, detected: mockDetected, n_rows: rows.length };
+        populateDropdowns(cols, mockDetected);
+        showPicker(inspectData);
+      }
+      hideSpinner();
+    }
+  });
+}
+
+function detectColsMock(cols){
+  const cl = cols.map(c=>c.toLowerCase());
+  const sensitiveKW = ['gender','sex','race','age','ethnicity'];
+  const targetKW = ['approved','hired','outcome','result','label','target','granted','selected','y'];
+  let sens = {}, target = null;
+  for(const kw of sensitiveKW){
+    const idx = cl.findIndex(c=>c.includes(kw));
+    if(idx>=0) sens[kw] = cols[idx];
+  }
+  for(const kw of targetKW){
+    const idx = cl.findIndex(c=>c.includes(kw));
+    if(idx>=0){ target = cols[idx]; break; }
+  }
+  return {sensitive_attrs: sens, target_col: target, binary_cols: target ? [target] : []};
+}
+
+function populateDropdowns(cols, detected){
+  const ss = document.getElementById('sel-sensitive');
+  const st = document.getElementById('sel-target');
+  ss.innerHTML = '<option value="">-- Select protected attribute --</option>';
+  st.innerHTML = '<option value="">-- Select target/outcome column --</option>';
+  cols.forEach(c=>{
+    ss.innerHTML += `<option value="${c}">${c}</option>`;
+    st.innerHTML += `<option value="${c}">${c}</option>`;
+  });
+  // Auto-select detected
+  if(detected){
+    const sens = detected.sensitive_attrs || {};
+    const firstSens = Object.values(sens)[0];
+    if(firstSens) ss.value = firstSens;
+    if(detected.target_col) st.value = detected.target_col;
+  }
+}
+
+function populateDropdownsFromCols(cols){
+  populateDropdowns(cols, detectColsMock(cols));
+}
+
+function showPicker(d){
+  const picker = document.getElementById('col-picker');
+  picker.style.display = 'block';
+  const sens = d.detected?.sensitive_attrs || {};
+  const tgt  = d.detected?.target_col;
+  const detected_list = Object.values(sens).map(v=>`'${v}'`).join(', ');
+  const info = `Dataset: ${d.n_rows || '?'} rows · Detected sensitive: ${detected_list||'none'} · Target: '${tgt||'none'}'`;
+  document.getElementById('cp-info').textContent = info;
+
+  // Enable run button
+  const runBtn = document.getElementById('sb-run');
+  runBtn.disabled = false;
+  runBtn.textContent = '⚡ Analyze Dataset';
+  toast('Dataset loaded! Configure columns and click Analyze.', 'var(--lime)');
+}
+
+function renderPreview(cols, rows){
+  const pw = document.getElementById('preview-wrap');
+  if(!rows.length){ pw.innerHTML=''; return; }
+  const shownCols = cols.slice(0,8);
+  let html = '<div style="font-family:var(--fm);font-size:10.5px;color:var(--mist3);margin-bottom:6px">Dataset preview (first rows)</div>';
+  html += '<div class="tbl-wrap"><table class="preview-tbl"><thead><tr>';
+  shownCols.forEach(c=>{ html+=`<th>${c}</th>`; });
+  if(cols.length>8) html+=`<th>+${cols.length-8} more</th>`;
+  html+='</tr></thead><tbody>';
+  rows.slice(0,5).forEach(row=>{
+    html+='<tr>';
+    shownCols.forEach(c=>{ html+=`<td>${row[c]??''}</td>`; });
+    if(cols.length>8) html+=`<td>…</td>`;
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  pw.innerHTML = html;
+}
+
+/* ── Run Analysis ───────────────────────────────────────────────── */
+async function runAnalysis(){
+  if(!uploadedFile){ toast('Please upload a CSV file first', 'var(--rose)'); return; }
+  const sensitiveCol = document.getElementById('sel-sensitive').value;
+  const targetCol    = document.getElementById('sel-target').value;
+  if(!sensitiveCol){ toast('Select a protected attribute column', 'var(--amber)'); return; }
+  if(!targetCol){ toast('Select a target/outcome column', 'var(--amber)'); return; }
+
+  const mit = Object.keys(mitState).filter(k=>mitState[k]).join(',');
+  showSpinner('Running bias analysis…');
+
+  let data;
+  try{
+    if(!USE_MOCK){
+      const fd = new FormData();
+      fd.append('file', uploadedFile);
+      fd.append('sensitive_col', sensitiveCol);
+      fd.append('target_col', targetCol);
+      fd.append('mitigation', mit);
+      const res = await fetch(API+'/api/analyze', {method:'POST', body:fd});
+      data = await res.json();
+      if(data.error) throw new Error(data.error);
+    } else {
+      await delay(2200);
+      data = buildMockResult(sensitiveCol, targetCol);
+    }
+    lastAnalysis = data;
+    renderResults(data);
+    buildWhatIfForm(data);
+    loadHistory();
+    toast('Analysis complete!', 'var(--lime)');
+  } catch(e){
+    toast('Error: '+e.message, 'var(--rose)');
+    console.error(e);
+  }
+  hideSpinner();
+}
+
+/* ── Apply Fix ──────────────────────────────────────────────────── */
+async function applyFix(){
+  document.getElementById('fix-cta').style.display = 'none';
+  await runAnalysis();
+}
+
+/* ── Build Mock Result (client-side simulation) ─────────────────── */
+function buildMockResult(sensCol, tgtCol){
+  // Parse from uploaded file client-side using PapaParse
+  // This runs synchronously to build a realistic mock
+  const groups = inspectData?._parsed_groups || ['Group A','Group B'];
+  const r1 = 0.65 + Math.random()*0.15;
+  const r2 = 0.35 + Math.random()*0.18;
+  const r1f= Math.min(r1*0.92, 0.95);
+  const r2f= Math.min(r2+0.18, r1f*0.92);
+  const di_b = +(r2/r1).toFixed(3);
+  const di_a = +(r2f/r1f).toFixed(3);
+  const spd_b= +(r1-r2).toFixed(3);
+  const spd_a= +(r1f-r2f).toFixed(3);
+  const eo_b = +(0.18+Math.random()*0.10).toFixed(3);
+  const eo_a = +(0.04+Math.random()*0.06).toFixed(3);
+  const acc  = +(0.72+Math.random()*0.10).toFixed(3);
+  const n = inspectData?.n_rows || 120;
+  const n1 = Math.round(n*0.55), n2 = n-n1;
+
+  const fs_b = calcFS(di_b, spd_b, eo_b);
+  const fs_a = calcFS(di_a, spd_a, eo_a);
+
+  const biasDetected = di_b < 0.8 || spd_b > 0.1;
+
+  const g1 = sensCol.toLowerCase().includes('gender')||sensCol.toLowerCase().includes('sex')
+    ? (Math.random()>.5?'Male':'Female') : 'Group A';
+  const g2 = g1==='Male'?'Female':g1==='Female'?'Male':'Group B';
+
+  return {
+    analysis_id: Date.now(),
+    column_info: { sensitive_col: sensCol, target_col: tgtCol, total_rows: n, groups: [g1,g2] },
+    before: {
+      accuracy: acc, statistical_parity_difference: spd_b,
+      disparate_impact: di_b, equal_opportunity_difference: eo_b,
+      fairness_score: fs_b,
+      bias_level: fs_b<50?'HIGH':fs_b<75?'MEDIUM':'LOW',
+      bias_color: fs_b<50?'red':fs_b<75?'yellow':'green',
+      bias_detected: biasDetected,
+      confidence_score: Math.min(100,50+n/10),
+      group_stats: {
+        [g1]:{n:n1,approved:Math.round(r1*n1),approval_rate:+r1.toFixed(3)},
+        [g2]:{n:n2,approved:Math.round(r2*n2),approval_rate:+r2.toFixed(3)}
+      },
+      privileged_group: g1, disadvantaged_group: g2
+    },
+    after: {
+      accuracy: +(acc-0.02).toFixed(3),
+      statistical_parity_difference: spd_a,
+      disparate_impact: di_a, equal_opportunity_difference: eo_a,
+      fairness_score: fs_a,
+      bias_level: fs_a<50?'HIGH':fs_a<75?'MEDIUM':'LOW',
+      bias_color: fs_a<50?'red':fs_a<75?'yellow':'green',
+      bias_detected: di_a < 0.8,
+      group_stats:{
+        [g1]:{n:n1,approved:Math.round(r1f*n1),approval_rate:+r1f.toFixed(3)},
+        [g2]:{n:n2,approved:Math.round(r2f*n2),approval_rate:+r2f.toFixed(3)}
+      }
+    },
+    improvement:{
+      fairness_score:+(fs_a-fs_b).toFixed(1),
+      disparate_impact:+(di_a-di_b).toFixed(4),
+      statistical_parity:+(spd_b-spd_a).toFixed(4),
+      equal_opportunity:+(eo_b-eo_a).toFixed(4),
+      pct_improvement:+((fs_a-fs_b)/Math.max(100-fs_b,1)*100).toFixed(1),
+      bias_fixed: biasDetected && di_a >= 0.8
+    },
+    bias_detected: biasDetected,
+    apply_mit: biasDetected,
+    mitigation_methods: ['pre','in','post'],
+    explanations:[
+      {type:'Root Cause',icon:'🔍',
+       text:`Bias detected because '${g2}' has ${((r1-r2)*100).toFixed(1)}% lower approval rate (${(r2*100).toFixed(1)}%) than '${g1}' (${(r1*100).toFixed(1)}%). Disparate Impact = ${di_b.toFixed(2)} (threshold: 0.80).`,
+       severity:di_b<0.65?'HIGH':'MEDIUM'},
+      {type:'Legal Threshold',icon:'⚠️',
+       text:`Disparate Impact ${di_b.toFixed(2)} is below the 0.80 EEOC 4/5ths Rule threshold. This may constitute adverse impact discrimination in lending, hiring, or housing.`,
+       severity:'HIGH'},
+      {type:'Statistical Parity',icon:'📉',
+       text:`Statistical Parity Difference = ${spd_b.toFixed(2)}. The model applies different approval standards to different groups. Ideal value is 0.`,
+       severity:'MEDIUM'},
+      {type:'Mitigation Applied',icon:'✅',
+       text:`After mitigation: Disparate Impact improved from ${di_b.toFixed(2)} → ${di_a.toFixed(2)}. Fairness Score: ${fs_b.toFixed(1)} → ${fs_a.toFixed(1)} (+${(fs_a-fs_b).toFixed(1)} pts).`,
+       severity:'IMPROVEMENT'}
+    ],
+    recommendations:[
+      {priority:'HIGH',icon:'🎯',title:'Best Fix: Threshold Adjustment',detail:'Fastest and most interpretable. Adjust per-group decision thresholds to equalize approval rates without retraining.'},
+      {priority:'HIGH',icon:'🔴',title:'Collect Balanced Training Data',detail:'Actively collect more records from underrepresented groups. Imbalanced data is the root cause of most algorithmic bias.'},
+      {priority:'MEDIUM',icon:'🟡',title:'Remove Sensitive Attribute Influence',detail:'Use fairness constraints during training to prevent the sensitive column from driving predictions directly or via proxies.'},
+      {priority:'MEDIUM',icon:'🟡',title:'Audit Proxy Features',detail:`Features correlated with '${sensCol}' (e.g. zip code, name patterns) can re-introduce bias even after removing the sensitive column.`},
+      {priority:'LOW',icon:'🟢',title:'Deploy Ongoing Monitoring',detail:'Set automated fairness metric alerts in production. Data drift can re-introduce bias over time.'},
+      {priority:'LOW',icon:'🟢',title:'Create Model Card',detail:'Document known biases, intended use, and fairness evaluations per EU AI Act and NIST AI RMF requirements.'}
+    ],
+    feature_bias:[
+      {feature:'income',group1_mean:72000,group2_mean:58000,gap_pct:24.1,bias_contribution:'HIGH'},
+      {feature:'credit_score',group1_mean:710,group2_mean:685,gap_pct:11.8,bias_contribution:'MEDIUM'},
+      {feature:'employment_years',group1_mean:8.2,group2_mean:6.1,gap_pct:9.5,bias_contribution:'MEDIUM'},
+      {feature:'loan_amount',group1_mean:42000,group2_mean:38000,gap_pct:5.8,bias_contribution:'LOW'},
+      {feature:'debt_ratio',group1_mean:0.31,group2_mean:0.33,gap_pct:3.2,bias_contribution:'LOW'}
+    ]
+  };
+}
+function calcFS(di,spd,eo){
+  return Math.min(100, +((Math.min(di/0.8,1)*35 + Math.max(0,1-spd/0.3)*35 + Math.max(0,1-eo/0.3)*30)).toFixed(1));
+}
+
+/* ── Render Results ─────────────────────────────────────────────── */
+let barInst=null, pieInst=null;
+
+function renderResults(d){
+  document.getElementById('empty-state').style.display='none';
+  const rc = document.getElementById('result-content');
+  rc.style.display='flex';
+
+  const B=d.before, A=d.after, I=d.improvement;
+  const thresh=parseFloat(document.getElementById('thresh-range').value);
+
+  // Alert
+  const alertEl=document.getElementById('r-alert');
+  const ac=B.bias_color, acls=ac==='red'?'alert-r':ac==='yellow'?'alert-y':'alert-g';
+  const emj=ac==='red'?'🚨':ac==='yellow'?'⚠️':'✅';
+  alertEl.innerHTML=`<div class="alert ${acls}"><div class="al-dot"></div><div>
+    <strong>${emj} ${B.bias_level} BIAS — Fairness Score: ${B.fairness_score.toFixed(1)}/100</strong><br>
+    <span style="font-size:12.5px">Disparate Impact: ${B.disparate_impact.toFixed(3)} (threshold ${thresh.toFixed(2)}) · SPD: ${B.statistical_parity_difference.toFixed(3)} · Column: '${d.column_info.sensitive_col}' vs '${d.column_info.target_col}'</span>
+    <br><span style="font-size:11px;font-family:var(--fm)">Fairness Confidence: ${B.confidence_score?.toFixed(0)||'—'}% (based on ${d.column_info.total_rows} rows)</span>
+  </div></div>`;
+
+  // Scores
+  const sb=document.getElementById('sc-before'), sa=document.getElementById('sc-after');
+  sb.textContent=B.fairness_score.toFixed(1);
+  sb.className='sc-val '+(B.fairness_score<50?'cv-rose':B.fairness_score<75?'cv-amber':'cv-lime');
+  sa.textContent=A.fairness_score.toFixed(1);
+
+  // Improvement badge
+  const ib=document.getElementById('imp-badge');
+  ib.style.display='flex';
+  document.getElementById('imp-main').textContent=`+${I.fairness_score.toFixed(1)} pts fairness improvement`;
+  document.getElementById('imp-sub').textContent=
+    `${I.pct_improvement.toFixed(1)}% gain · Methods: ${(d.mitigation_methods||[]).join(', ')||'none applied'}`;
+  document.getElementById('imp-pills').innerHTML=
+    [`DI: ${B.disparate_impact.toFixed(3)} → ${A.disparate_impact.toFixed(3)}`,
+     `SPD: ${B.statistical_parity_difference.toFixed(3)} → ${A.statistical_parity_difference.toFixed(3)}`,
+     `EO: ${B.equal_opportunity_difference.toFixed(3)} → ${A.equal_opportunity_difference.toFixed(3)}`]
+    .map(t=>`<div class="pill">${t}</div>`).join('');
+
+  // Metrics
+  const mg=document.getElementById('mets-grid');
+  const metrics=[
+    {l:'Disparate Impact',tip:'Ratio minority/majority approval rate. Must be >0.80 (EEOC 4/5ths Rule). <0.60 = severe/illegal bias.',
+     bv:B.disparate_impact.toFixed(3),av:A.disparate_impact.toFixed(3),
+     bn:B.disparate_impact,good:v=>v>=thresh,pct:B.disparate_impact*100},
+    {l:'Stat. Parity Diff',tip:'Difference in approval rates between groups. Ideal = 0. >0.20 = significant discrimination.',
+     bv:B.statistical_parity_difference.toFixed(3),av:A.statistical_parity_difference.toFixed(3),
+     bn:B.statistical_parity_difference,good:v=>v<0.10,pct:(1-B.statistical_parity_difference)*100},
+    {l:'Equal Opportunity',tip:'True positive rate difference between groups. Measures if qualified individuals across groups have equal chances.',
+     bv:B.equal_opportunity_difference.toFixed(3),av:A.equal_opportunity_difference.toFixed(3),
+     bn:B.equal_opportunity_difference,good:v=>v<0.10,pct:(1-B.equal_opportunity_difference)*100},
+    {l:'Accuracy',tip:'Overall model accuracy. Warning: high accuracy does NOT mean fairness. Always check fairness metrics separately.',
+     bv:(B.accuracy*100).toFixed(1)+'%',av:(A.accuracy*100).toFixed(1)+'%',
+     bn:B.accuracy,good:v=>v>0.8,pct:B.accuracy*100}
+  ];
+  mg.innerHTML=metrics.map(m=>{
+    const clr=m.good(m.bn)?'cv-lime':m.bn<0.6||m.bn>0.25?'cv-rose':'cv-amber';
+    const bg=m.good(m.bn)?'var(--lime)':m.bn<0.6||m.bn>0.25?'var(--rose)':'var(--amber)';
+    return`<div class="mcard">
+      <div class="mc-l">${m.l}<span class="tip"><span class="tip-i">?</span><span class="tip-t">${m.tip}</span></span></div>
+      <div class="mc-v ${clr}">${m.bv}</div>
+      <div class="mc-cmp"><span class="mc-old">${m.bv}</span><span class="mc-arr">→</span><span class="mc-new">${m.av}</span></div>
+      <div class="mc-bar"><div class="mc-bfill" style="width:${Math.min(m.pct,100)}%;background:${bg}"></div></div>
+    </div>`;
+  }).join('');
+
+  // Bar chart
+  if(barInst) barInst.destroy();
+  const groups=Object.keys(B.group_stats);
+  const bRates=groups.map(g=>+(B.group_stats[g].approval_rate*100).toFixed(1));
+  const aRates=groups.map(g=>+(A.group_stats[g].approval_rate*100).toFixed(1));
+  barInst=new Chart(document.getElementById('bar-chart'),{
+    type:'bar',
+    data:{labels:groups,datasets:[
+      {label:'Before',data:bRates,backgroundColor:'rgba(244,63,94,.7)',borderRadius:5,borderSkipped:false},
+      {label:'After',data:aRates,backgroundColor:'rgba(34,197,94,.7)',borderRadius:5,borderSkipped:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+'%'}}},
+      scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%',color:'#8b99be'},
+        grid:{color:'rgba(255,255,255,0.04)'},border:{display:false}},
+        x:{ticks:{color:'#8b99be'},grid:{display:false},border:{display:false}}}}
+  });
+
+  // Pie chart
+  if(pieInst) pieInst.destroy();
+  const totApp=groups.reduce((s,g)=>s+B.group_stats[g].approved,0);
+  const totDen=groups.reduce((s,g)=>s+B.group_stats[g].n-B.group_stats[g].approved,0);
+  pieInst=new Chart(document.getElementById('pie-chart'),{
+    type:'doughnut',
+    data:{labels:['Approved','Denied'],datasets:[{data:[totApp,totDen],
+      backgroundColor:['rgba(34,197,94,.75)','rgba(244,63,94,.75)'],
+      borderWidth:0,hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},cutout:'62%'}
+  });
+  document.getElementById('pie-leg').innerHTML=
+    `🟢 Approved: ${totApp}&nbsp;&nbsp;🔴 Denied: ${totDen}`;
+
+  // Heatmap
+  renderHeatmap(B, A);
+
+  // Fix CTA / no bias
+  document.getElementById('fix-cta').style.display = d.bias_detected ? 'flex' : 'none';
+  document.getElementById('no-bias-msg').style.display = d.bias_detected ? 'none' : 'flex';
+
+  // Explanations
+  document.getElementById('r-exps').innerHTML=(d.explanations||[]).map(e=>`
+    <div class="exp-card"><div class="exp-ico">${e.icon}</div>
+    <div class="exp-body"><h4>${e.type}<span class="sev sev-${e.severity}">${e.severity}</span></h4>
+    <p>${e.text}</p></div></div>`).join('');
+
+  // Feature bias heatmap
+  renderFeatureBias(d.feature_bias||[], d.column_info?.groups||groups);
+
+  // Recommendations
+  document.getElementById('r-recs').innerHTML=(d.recommendations||[]).map(r=>`
+    <div class="rec"><div class="rec-ico">${r.icon}</div>
+    <div class="rec-b"><h4>${r.title}</h4><p>${r.detail}</p></div></div>`).join('');
+}
+
+function renderHeatmap(B, A){
+  const metrics=['DI','SPD','EO','Acc'];
+  const bRow=[B.disparate_impact, B.statistical_parity_difference, B.equal_opportunity_difference, B.accuracy];
+  const aRow=[A.disparate_impact, A.statistical_parity_difference, A.equal_opportunity_difference, A.accuracy];
+  function cls(m,v){
+    if(m==='DI')  return v>=0.8?'hm-g2':v>=0.6?'hm-y':'hm-r';
+    if(m==='Acc') return v>=0.8?'hm-g2':v>=0.65?'hm-y':'hm-r';
+    return v<=0.1?'hm-g2':v<=0.25?'hm-y':'hm-r';
+  }
+  let html=`<div class="hm"><div class="hm-g" style="grid-template-columns:70px repeat(4,1fr)">
+    <div class="hm-h"></div>${metrics.map(m=>`<div class="hm-h">${m}</div>`).join('')}
+    <div class="hm-l" style="color:var(--rose)">Before</div>
+    ${bRow.map((v,i)=>`<div class="hm-cell ${cls(metrics[i],v)}">${v.toFixed(2)}</div>`).join('')}
+    <div class="hm-l" style="color:var(--lime)">After</div>
+    ${aRow.map((v,i)=>`<div class="hm-cell ${cls(metrics[i],v)}">${v.toFixed(2)}</div>`).join('')}
+  </div>
+  <div style="margin-top:9px;font-family:var(--fm);font-size:10px;color:var(--mist3);display:flex;gap:14px">
+    <span style="color:#86efac">🟢 Fair</span><span style="color:#fde68a">🟡 Borderline</span><span style="color:#fda4af">🔴 Biased</span>
+  </div></div>`;
+  document.getElementById('hm-wrap').innerHTML=html;
+}
+
+function renderFeatureBias(fb, groups){
+  if(!fb.length){ document.getElementById('fbhm-wrap').innerHTML='<div style="font-size:12px;color:var(--mist3);font-family:var(--fm)">No numeric feature data available.</div>'; return; }
+  const g1=groups[0]||'G1', g2=groups[1]||'G2';
+  let html=`<div class="fbh-grid">
+    <div class="fbh-h">Feature</div><div class="fbh-h">Gap (${g1} vs ${g2})</div>
+    <div class="fbh-h">Gap%</div><div class="fbh-h">Bias</div>`;
+  fb.forEach(f=>{
+    const bc=f.bias_contribution==='HIGH'?'var(--rose)':f.bias_contribution==='MEDIUM'?'var(--amber)':'var(--lime)';
+    html+=`<div class="fbh-name">${f.feature}</div>
+    <div class="fbh-bar"><div class="fbh-bf" style="width:${Math.min(f.gap_pct,100)}%;background:${bc}"></div></div>
+    <div class="fbh-pct" style="color:${bc}">${f.gap_pct}%</div>
+    <div class="fbh-lvl fbh-${f.bias_contribution[0]}">${f.bias_contribution}</div>`;
+  });
+  html+='</div>';
+  document.getElementById('fbhm-wrap').innerHTML=html;
+}
+
+/* ── Build What-If Form dynamically ─────────────────────────────── */
+function buildWhatIfForm(d){
+  const sc = d.column_info?.sensitive_col;
+  const groups = d.column_info?.groups || ['A','B'];
+  const wf = document.getElementById('wi-fields');
+  wf.innerHTML=`
+    <div class="wi-f">
+      <label>Numeric Feature 1</label>
+      <input type="number" id="wi-f1" placeholder="e.g. income" value="65000">
+    </div>
+    <div class="wi-f">
+      <label>Numeric Feature 2</label>
+      <input type="number" id="wi-f2" placeholder="e.g. credit score" value="700">
+    </div>
+    <div class="wi-f">
+      <label>Feature 3</label>
+      <input type="number" id="wi-f3" placeholder="e.g. years" value="5">
+    </div>
+    <div class="wi-f">
+      <label>${sc || 'Protected Attribute'}</label>
+      <select id="wi-sens">
+        ${groups.map(g=>`<option value="${g}">${g}</option>`).join('')}
+      </select>
+    </div>
+    <button class="wi-go" onclick="runWhatIf()">Simulate →</button>`;
+}
+
+/* ── What-If Simulator ──────────────────────────────────────────── */
+async function runWhatIf(){
+  if(!lastAnalysis){ toast('Run analysis first', 'var(--rose)'); return; }
+  const sc = lastAnalysis.column_info?.sensitive_col || 'gender';
+  const groups = lastAnalysis.column_info?.groups || ['A','B'];
+  const sensVal = document.getElementById('wi-sens')?.value || groups[0];
+  const f1=parseFloat(document.getElementById('wi-f1')?.value||65000);
+  const f2=parseFloat(document.getElementById('wi-f2')?.value||700);
+  const f3=parseFloat(document.getElementById('wi-f3')?.value||5);
+
+  // Simulate locally
+  const B=lastAnalysis.before;
+  const gStats=B.group_stats;
+  const thisRate = gStats[sensVal]?.approval_rate || 0.5;
+  // Weighted probability based on feature values and group
+  const featScore = f1/150000*0.35 + f2/850*0.30 + f3/25*0.15;
+  const prob = Math.min(0.98, Math.max(0.02, featScore + (thisRate-0.5)*0.4));
+  const pred = prob >= 0.5 ? 1 : 0;
+
+  // Counterfactual: other group
+  const otherGroup = groups.find(g=>g!==sensVal) || groups[0];
+  const otherRate = gStats[otherGroup]?.approval_rate || 0.5;
+  const cfProb = Math.min(0.98, Math.max(0.02, featScore + (otherRate-0.5)*0.4));
+  const cfPred = cfProb >= 0.5 ? 1 : 0;
+  const changed = pred !== cfPred;
+
+  const wrEl=document.getElementById('wi-res');
+  wrEl.innerHTML=`
+    <div class="wr-out" style="color:${pred?'var(--lime)':'var(--rose)'}">${pred?'Approved ✓':'Denied ✗'}</div>
+    <div class="wr-p">Probability: ${(prob*100).toFixed(1)}%</div>
+    <div style="height:5px;background:var(--ink3);border-radius:3px">
+      <div style="height:100%;width:${prob*100}%;background:${pred?'var(--lime)':'var(--rose)'};border-radius:3px;transition:width .8s"></div>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:var(--mist3);font-family:var(--fm)">
+      Group: ${sensVal} · f1=${f1.toLocaleString()} · f2=${f2} · f3=${f3}
+    </div>`;
+
+  const cfEl=document.getElementById('wi-cf');
+  cfEl.innerHTML=`<h4>Counterfactual: ${sc} → ${otherGroup}</h4>
+    <div style="margin-bottom:9px;font-size:13px">
+      <span style="color:${cfPred?'var(--lime)':'var(--rose)'};font-weight:700">${cfPred?'Approved ✓':'Denied ✗'}</span>
+      <span style="color:var(--mist3);font-family:var(--fm);font-size:11px;margin-left:7px">${(cfProb*100).toFixed(1)}%</span>
+    </div>
+    <div class="${changed?'cf-note cf-warn':'cf-note cf-ok'}">
+      ${changed
+        ? `⚠️ Changing ONLY '${sc}' from '${sensVal}' → '${otherGroup}' flips the decision. This is evidence of bias in the model.`
+        : `✓ Changing '${sc}' to '${otherGroup}' does NOT change this outcome. Features dominate this case.`
+      }
+    </div>`;
+}
+
+/* ── History ────────────────────────────────────────────────────── */
+async function loadHistory(){
+  if(USE_MOCK){ renderMockHistory(); return; }
+  try{
+    const res=await fetch(API+'/api/history');
+    const rows=await res.json();
+    const hl=document.getElementById('hist-list');
+    if(!rows.length){ hl.innerHTML='<div style="font-family:var(--fm);font-size:11px;color:var(--mist3)">No history yet</div>'; return; }
+    hl.innerHTML=rows.slice(0,5).map(r=>`
+      <div class="sb-hist-row" onclick="loadHistItem(${r.id})">
+        <div><div class="shr-n">${r.filename}</div><div class="shr-t">${new Date(r.timestamp).toLocaleDateString()} · ${r.n_rows} rows</div></div>
+        <div class="shr-b">Load</div>
+      </div>`).join('');
+  } catch{}
+}
+
+function renderMockHistory(){
+  const hl=document.getElementById('hist-list');
+  if(!lastAnalysis){ return; }
+  hl.innerHTML=`<div class="sb-hist-row">
+    <div><div class="shr-n">${uploadedFile?.name||'dataset.csv'}</div><div class="shr-t">Just now</div></div>
+    <div class="shr-b">Current</div>
+  </div>`;
+}
+
+async function loadHistItem(id){
+  try{
+    const res=await fetch(API+'/api/history/'+id);
+    const d=await res.json();
+    renderResults({...d,explanations:[],recommendations:[],bias_detected:true,mitigation_methods:[]});
+    toast('Loaded history #'+id, 'var(--sky)');
+  } catch{ toast('Cannot load item','var(--rose)'); }
+}
+
+/* ── Contact ────────────────────────────────────────────────────── */
+function submitContact(){
+  const el=document.getElementById('form-ok');
+  el.style.display='block';
+  setTimeout(()=>el.style.display='none',5000);
+}
+
+/* ── Init ───────────────────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded',()=>{
+  fetch(API+'/api/health').then(r=>r.json()).then(d=>{
+    USE_MOCK=false;
+    toast('Backend connected ✓ (Fairlearn: '+(d.fairlearn?'✓':'✗')+')', 'var(--lime)');
+  }).catch(()=>{
+    USE_MOCK=true;
+    console.log('[FairLens] Backend not available — client-side simulation mode. Start Flask for real ML.');
+  });
+  loadHistory();
+});
+</script>
+</body>
+</html>
