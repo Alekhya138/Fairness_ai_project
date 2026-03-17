@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ================= API CONFIG =================
     const API = window.location.hostname === "localhost"
         ? "http://localhost:5000"
-        : "https://your-backend.up.railway.app"; // change later
+        : "https://fairness-ai-project-1.onrender.com/"; // change later
 
     // ================= NAVBAR =================
     const navbar = document.querySelector('.navbar');
